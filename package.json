@@ -1,0 +1,32 @@
+{
+  "name": "dsh-log-capture-xg",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "DSH plugin: capture key runtime logs (ctx.logger + agent errors) into daily files with rule filtering.",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    }
+  },
+  "files": [
+    "lib/index.js",
+    "lib/logic.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/logic.spec.mjs"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "*"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "*",
+    "@deepseek-ai/dsh-agent": "*",
+    "typescript": "^5"
+  }
+}
