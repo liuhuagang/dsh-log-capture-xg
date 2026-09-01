@@ -1,8 +1,6 @@
 # dsh-log-capture-xg
 
-<div align="center">
-  <sub><a href="README.md">简体中文</a> | <b>English</b></sub>
-</div>
+[简体中文](README.md) · **English**
 
 > [!NOTE] Maintenance status
 > This plugin is an internal XG-series tool, **provided for learning and reference only, with no maintenance commitment** (issues are not guaranteed a response).
