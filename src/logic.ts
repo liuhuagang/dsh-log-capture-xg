@@ -20,6 +20,38 @@ export const LEVEL_ORDER: Record<LogLevel, number> = {
   debug: 3,
 }
 
+/**
+ * cordis `LoggerLevel` 的数值（与上面的严重度顺序**不同**）：
+ * ERROR=0 < INFO=1 < WARN=2 < DEBUG=3。
+ */
+export const LOGGER_LEVEL_NUMERIC: Record<LogLevel, number> = {
+  error: 0,
+  info: 1,
+  warn: 2,
+  debug: 3,
+}
+
+/** cordis 未声明 exporter.levels 时使用的默认下限（LoggerLevel.INFO）。 */
+export const LOGGER_LEVEL_DEFAULT = LOGGER_LEVEL_NUMERIC.info
+
+/**
+ * 注册 exporter 时必须声明的级别门槛。
+ *
+ * cordis 在投递前做的是**数值**比较（vendor/cordis/src/logger.ts）：
+ * ```
+ * targetLevel = exporter.levels?.[name] ?? exporter.levels?.default ?? logger.level ?? INFO(1)
+ * if (targetLevel < level) continue        // level：error=0 / info=1 / warn=2 / debug=3
+ * ```
+ * 不声明 `levels` 时下限就是 INFO(1)，于是 **warn(2) 与 debug(3) 永远到不了 exporter
+ * 回调**（连 info 也仅在 logger 实例级别被调高时才通过）——本插件的 `level` 过滤
+ * 也就形同失效。实测证据：2026-09-15～09-24 的捕获文件里 0 条 `[warn]`，而同期
+ * 会话日志存在明确的 ctx.logger.warn（如 compaction 失败告警）。
+ *
+ * 因此固定声明为最不严重的 DEBUG(3)：所有级别一律投递进来，真正的过滤交给
+ * {@link passesFilter}。
+ */
+export const EXPORTER_LEVELS: { default: number } = { default: LOGGER_LEVEL_NUMERIC.debug }
+
 /** 捕获过滤规则（与插件 Config 中同名字段一致） */
 export interface FilterRule {
   /** 最低级别（含）：记录该级别及更严重的日志，默认 'warn' */

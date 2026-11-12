@@ -1,6 +1,6 @@
 {
   "name": "dsh-log-capture-xg",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "description": "DSH plugin: capture key runtime logs (ctx.logger + agent errors) into daily files with rule filtering.",

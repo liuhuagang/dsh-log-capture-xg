@@ -12,12 +12,38 @@ import {
   appendLines,
   cleanupOldLogs,
   dayKey,
+  EXPORTER_LEVELS,
   fileNameFor,
+  LOGGER_LEVEL_DEFAULT,
+  LOGGER_LEVEL_NUMERIC,
   normalizeRule,
   parseLogDate,
   passesFilter,
   renderLine,
 } from '../lib/logic.js'
+
+// ---------- cordis exporter 门槛（EXPORTER_LEVELS 回归） ----------
+
+/** 模拟 cordis Logger._method 的投递判断：targetLevel < level → 丢弃 */
+const cordisDelivers = (threshold, type) => threshold >= LOGGER_LEVEL_NUMERIC[type]
+
+test('LOGGER_LEVEL_NUMERIC 与 cordis LoggerLevel 数值一致（非严重度顺序）', () => {
+  assert.deepEqual(LOGGER_LEVEL_NUMERIC, { error: 0, info: 1, warn: 2, debug: 3 })
+  assert.equal(LOGGER_LEVEL_DEFAULT, 1) // cordis 未声明 levels 时的默认下限 INFO
+})
+
+test('EXPORTER_LEVELS 放行全部四个级别（warn/debug 不再被 cordis 门槛拦掉）', () => {
+  for (const type of ['error', 'info', 'warn', 'debug']) {
+    assert.equal(cordisDelivers(EXPORTER_LEVELS.default, type), true, `${type} 必须投递到 exporter 回调`)
+  }
+})
+
+test('未声明 levels 时的默认门槛会丢弃 warn/debug（本 bug 的因果）', () => {
+  assert.equal(cordisDelivers(LOGGER_LEVEL_DEFAULT, 'error'), true)
+  assert.equal(cordisDelivers(LOGGER_LEVEL_DEFAULT, 'info'), true)
+  assert.equal(cordisDelivers(LOGGER_LEVEL_DEFAULT, 'warn'), false) // 修复前：ctx.logger.warn 永远到不了回调
+  assert.equal(cordisDelivers(LOGGER_LEVEL_DEFAULT, 'debug'), false)
+})
 
 // ---------- normalizeRule ----------
 

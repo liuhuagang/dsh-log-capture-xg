@@ -37,7 +37,7 @@ exporter 回调内所有磁盘操作均 try/catch 兜底——写文件失败不
 |------|------|
 | `ctx.logger` 全通道 | 所有插件与服务（`log-capture`、`llm-deepseek`、`sandbox-local` 等）的结构化日志 |
 | `agent/error` 事件 | 轮次/步骤运行错误（即使未走 logger 也转写） |
-| 会话生命周期 | `agent/session-start` / `agent/disposed` 标记行（`== session start: <id> ==`） |
+| 会话生命周期 | `agent/created` / `agent/disposed` 标记行（`== session start: <id> ==`；0.1.7 前的老事件名 `agent/session-start` 已不存在） |
 
 ## 配置（cordis.patch.yml）
 
@@ -57,6 +57,15 @@ exporter 回调内所有磁盘操作均 try/catch 兜底——写文件失败不
 
 级别语义按严重度 `error > warn > info > debug` 判断，与 cordis 内部
 `LoggerLevel` 的数值顺序（ERROR=0 < INFO=1 < WARN=2 < DEBUG=3）无关。
+
+> [!IMPORTANT] exporter 级别门槛（1.0.1 修复）
+> cordis 在投递前做的是**数值**比较：
+> `targetLevel = exporter.levels?.default ?? logger.level ?? INFO(1)`，`targetLevel < level` 即丢弃。
+> 不声明 `exporter.levels` 时下限就是 INFO(1)，于是 **warn/debug 永远到不了 exporter 回调**，
+> 本插件的 `level` 规则形同失效（1.0.1 前实测：捕获文件里 0 条 `[warn]`，压缩失败告警等
+> 关键 warn 全部丢失）。
+> 现固定声明 `levels: { default: 3 }`（DEBUG），把四个级别一律投递进来，真正的过滤交给
+> `passesFilter`——所以 `level: 'debug'` 现在也能真正生效。
 
 ## 典型用法
 
@@ -79,8 +88,10 @@ config:
 ## 部署
 
 1. 构建：`node node_modules/typescript/bin/tsc -p tsconfig.json`（产物 `lib/`）
-2. 复制 `lib/` 与 `package.json` 到
-   `~/.dsh/profiles/web/node_modules/dsh-log-capture-xg/`
+2. web profile 已把本插件声明为 `link:` 依赖（`C:\Users\Liu\.dsh\profiles\web\package.json`
+   中的 `link:<本仓库>/plugins/dsh-log-capture-xg`；profile 的
+   `node_modules/dsh-log-capture-xg/` 是本仓库目录的符号链接，2026-10-12 迁移）——
+   构建通过即完成部署，**勿向 `node_modules/` 复制文件**
 3. `cordis.patch.yml` 添加上述条目
 4. 重启 DSH（`pnpm dsh web`）——启动后日志文件出现
    `== log capture started: ... ==` 标记行即生效

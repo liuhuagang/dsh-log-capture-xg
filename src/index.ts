@@ -17,6 +17,9 @@
  *   - include / exclude：logger name 前缀名单（如 'project-profile'、'llm-'）
  *   - keywords：消息文本关键词（任一命中才记录）
  *
+ * 注意：exporter 注册时必须显式声明 `levels`（见 logic.ts 的 EXPORTER_LEVELS）——
+ * cordis 投递前按数值门槛比较，未声明时 warn/debug 会被丢弃，上述 level 规则失效。
+ *
  * 落盘：<dir>/dsh-capture-<YYYY-MM-DD>.log 按天轮转，超龄文件自动清理。
  * exporter 回调内所有磁盘操作均 try/catch 兜底 —— 写文件失败不得影响
  * 日志调用方（Logger._method 对 exporter 异常无隔离）。
@@ -30,6 +33,7 @@ import {
   appendLines,
   cleanupOldLogs,
   dayKey,
+  EXPORTER_LEVELS,
   fileNameFor,
   normalizeRule,
   passesFilter,
@@ -104,9 +108,13 @@ export function apply(ctx: Context, config: Config): void {
   }
 
   // 1. logger exporter：全通道结构化日志，回调内按规则过滤。
-  //    不设 exporter.levels —— cordis 的 level 数值（ERROR=0 < INFO=1 < WARN=2
-  //    < DEBUG=3）不是严重度顺序，语义易混；统一在回调里按 type 判断。
+  //    必须显式声明 levels（= DEBUG 数值 3）：cordis 投递前按**数值**比较
+  //    `exporter.levels?.default ?? logger.level ?? INFO(1)` 与记录级别
+  //    （ERROR=0 < INFO=1 < WARN=2 < DEBUG=3），不声明时 warn/debug 会被直接丢弃、
+  //    根本到不了 export 回调（2026-09-24 修复：此前捕获文件里 0 条 [warn]）。
+  //    声明为最宽后，级别语义统一在回调里按严重度判断（见 logic.ts 的 passesFilter）。
   ctx.logger.exporter({
+    levels: EXPORTER_LEVELS,
     export: (message: Message) => {
       // Logger.format 需要 Exporter 形态（只用到 colors/formatters/maxLength）
       const text = Logger.format({ colors: false, export: () => {} }, message)
@@ -122,7 +130,9 @@ export function apply(ctx: Context, config: Config): void {
 
   // 2. 会话生命周期标记（全局 ctx 注册可收到 agent/* 事件：scope filter 对
   //    无 scope 标签的 ctx 放行）。监听器异常不得 veto 发布，整体兜底。
-  ctx.on('agent/session-start', ({ agent, source }: { agent: Agent; source: string }) => {
+  //    事件名：DSH 0.1.7 起为 agent/created（旧的 agent/session-start 已不存在，
+  //    0.1.7 前的构建因此静默丢失会话开始标记，同时编译报 TS2345）。
+  ctx.on('agent/created', ({ agent, source }: { agent: Agent; source: string }) => {
     try {
       mark(`== session start: ${String(agent.id)} (source=${source}) ==`)
     } catch (error) {

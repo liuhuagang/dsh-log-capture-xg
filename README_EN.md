@@ -33,7 +33,7 @@ All disk operations inside the exporter callback are wrapped with try/catch as a
 |--------|-------------|
 | All `ctx.logger` channels | Structured logs from all plugins and services (`log-capture`, `llm-deepseek`, `sandbox-local`, etc.) |
 | `agent/error` events | Turn/step runtime errors (transcribed even when they do not go through the logger) |
-| Session lifecycle | `agent/session-start` / `agent/disposed` marker lines (`== session start: <id> ==`) |
+| Session lifecycle | `agent/created` / `agent/disposed` marker lines (`== session start: <id> ==`; the pre-0.1.7 event name `agent/session-start` no longer exists) |
 
 ## Configuration (cordis.patch.yml)
 
@@ -52,6 +52,12 @@ All disk operations inside the exporter callback are wrapped with try/catch as a
 ```
 
 Level semantics are judged by severity `error > warn > info > debug`, which is independent of the numeric order of cordis's internal `LoggerLevel` (ERROR=0 < INFO=1 < WARN=2 < DEBUG=3).
+
+> [!IMPORTANT] Exporter level gate (fixed in 1.0.1)
+> cordis compares numbers before delivery:
+> `targetLevel = exporter.levels?.default ?? logger.level ?? INFO(1)`, and drops the record when `targetLevel < level`.
+> Without a declared `exporter.levels` the floor is INFO(1), so **warn/debug never reach the exporter callback** and this plugin's `level` rule is effectively dead (measured before 1.0.1: zero `[warn]` lines in the capture files, so key warnings such as compaction failures were lost).
+> The plugin now declares `levels: { default: 3 }` (DEBUG), delivering all four levels and leaving the real filtering to `passesFilter` — so `level: 'debug'` really works now.
 
 ## Typical usage
 
@@ -74,7 +80,7 @@ config:
 ## Deployment
 
 1. Build: `node node_modules/typescript/bin/tsc -p tsconfig.json` (output `lib/`)
-2. Copy `lib/` and `package.json` to `~/.dsh/profiles/web/node_modules/dsh-log-capture-xg/`
+2. The web profile declares this plugin as a `link:` dependency (`link:<this-repo>/plugins/dsh-log-capture-xg` in `C:\Users\Liu\.dsh\profiles\web\package.json`; the profile's `node_modules/dsh-log-capture-xg/` is a symlink into this repo's directory, migrated 2026-10-12) — a passing build is the deployment; **do not copy files into `node_modules/`**
 3. Add the above entry to `cordis.patch.yml`
 4. Restart DSH (`pnpm dsh web`) — after startup, the `== log capture started: ... ==` marker line appears in the log file once it takes effect
 
